@@ -577,13 +577,18 @@ verify_checksum(krb5_context context,
     } else
 	dkey = NULL;
 
+
+    iov[0].data.data = data;
+    iov[0].data.length = len;
+    iov[0].flags = KRB5_CRYPTO_TYPE_DATA;
+
     /*
      * If checksum have a verify function, lets use that instead of
      * calling ->checksum and then compare result.
      */
 
     if(ct->verify) {
-	ret = (*ct->verify)(context, dkey, data, len, usage, cksum);
+	ret = (*ct->verify)(context, dkey, usage, iov, 1, cksum);
 	if (ret)
 	    krb5_set_error_message(context, ret,
 				   N_("Decrypt integrity check failed for checksum "
@@ -596,9 +601,6 @@ verify_checksum(krb5_context context,
     if (ret)
 	return ret;
 
-    iov[0].data.data = data;
-    iov[0].data.length = len;
-    iov[0].flags = KRB5_CRYPTO_TYPE_DATA;
     ret = (*ct->checksum)(context, dkey, usage, iov, 1, &c);
     if (ret) {
 	krb5_data_free(&c.checksum);
