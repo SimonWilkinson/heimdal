@@ -58,9 +58,9 @@ static struct _krb5_key_type keytype_arcfour = {
 krb5_error_code
 _krb5_HMAC_MD5_checksum(krb5_context context,
 			struct _krb5_key_data *key,
-			const void *data,
-			size_t len,
 			unsigned usage,
+			const struct iovec *iov,
+			int niov,
 			Checksum *result)
 {
     EVP_MD_CTX *m;
@@ -73,6 +73,7 @@ _krb5_HMAC_MD5_checksum(krb5_context context,
     unsigned char tmp[16];
     unsigned char ksign_c_data[16];
     krb5_error_code ret;
+    int i;
 
     m = EVP_MD_CTX_create();
     if (m == NULL)
@@ -93,7 +94,8 @@ _krb5_HMAC_MD5_checksum(krb5_context context,
     t[2] = (usage >> 16) & 0xFF;
     t[3] = (usage >> 24) & 0xFF;
     EVP_DigestUpdate(m, t, 4);
-    EVP_DigestUpdate(m, data, len);
+    for (i = 0; i < niov; i++)
+	EVP_DigestUpdate(m, iov[i].iov_base, iov[i].iov_len);
     EVP_DigestFinal_ex (m, tmp, NULL);
     EVP_MD_CTX_destroy(m);
 

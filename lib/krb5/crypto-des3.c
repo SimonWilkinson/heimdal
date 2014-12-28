@@ -59,6 +59,7 @@ DES3_prf(krb5_context context,
 	 krb5_data *out)
 {
     struct _krb5_checksum_type *ct = crypto->et->checksum;
+    struct iovec iov[1];
     krb5_error_code ret;
     Checksum result;
     krb5_keyblock *derived;
@@ -70,7 +71,9 @@ DES3_prf(krb5_context context,
 	return ret;
     }
 
-    ret = (*ct->checksum)(context, NULL, in->data, in->length, 0, &result);
+    iov[0].iov_base = in->data;
+    iov[0].iov_len = in->length;
+    ret = (*ct->checksum)(context, NULL, 0, iov, 1, &result);
     if (ret) {
 	krb5_data_free(&result.checksum);
 	return ret;
@@ -140,12 +143,12 @@ static struct _krb5_key_type keytype_des3_derived = {
 static krb5_error_code
 RSA_MD5_DES3_checksum(krb5_context context,
 		      struct _krb5_key_data *key,
-		      const void *data,
-		      size_t len,
 		      unsigned usage,
+		      const struct iovec *iov,
+		      int niov,
 		      Checksum *C)
 {
-    return _krb5_des_checksum(context, EVP_md5(), key, data, len, C);
+    return _krb5_des_checksum(context, EVP_md5(), key, iov, niov, C);
 }
 
 static krb5_error_code
