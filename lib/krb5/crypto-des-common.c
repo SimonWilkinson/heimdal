@@ -58,7 +58,7 @@ KRB5_LIB_FUNCTION krb5_error_code KRB5_LIB_CALL
 _krb5_des_checksum(krb5_context context,
 		   const EVP_MD *evp_md,
 		   struct _krb5_key_data *key,
-		   const struct iovec *iov,
+		   const struct krb5_crypto_iov *iov,
 		   int niov,
 		   Checksum *cksum)
 {
@@ -76,8 +76,12 @@ _krb5_des_checksum(krb5_context context,
 
     EVP_DigestInit_ex(m, evp_md, NULL);
     EVP_DigestUpdate(m, p, 8);
-    for (i = 0; i < niov; i++)
-	EVP_DigestUpdate(m, iov[i].iov_base, iov[i].iov_len);
+    for (i = 0; i < niov; i++) {
+	if (iov[i].flags == KRB5_CRYPTO_TYPE_DATA ||
+	    iov[i].flags == KRB5_CRYPTO_TYPE_SIGN_ONLY) {
+	    EVP_DigestUpdate(m, iov[i].data.data, iov[i].data.length);
+	}
+    }
     EVP_DigestFinal_ex (m, p + 8, NULL);
     EVP_MD_CTX_destroy(m);
     memset (&ivec, 0, sizeof(ivec));
@@ -130,7 +134,7 @@ static krb5_error_code
 RSA_MD5_checksum(krb5_context context,
 		 struct _krb5_key_data *key,
 		 unsigned usage,
-		 const struct iovec *iov,
+		 const struct krb5_crypto_iov *iov,
 		 int niov,
 		 Checksum *C)
 {

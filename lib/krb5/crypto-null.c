@@ -55,7 +55,7 @@ static krb5_error_code
 NONE_checksum(krb5_context context,
 	      struct _krb5_key_data *key,
 	      unsigned usage,
-	      const struct iovec *iov,
+	      const struct krb5_crypto_iov *iov,
 	      int niov,
 	      Checksum *C)
 {

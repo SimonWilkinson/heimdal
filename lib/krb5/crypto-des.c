@@ -100,7 +100,7 @@ static krb5_error_code
 CRC32_checksum(krb5_context context,
 	       struct _krb5_key_data *key,
 	       unsigned usage,
-	       const struct iovec *iov,
+	       const struct krb5_crypto_iov *iov,
 	       int niov,
 	       Checksum *C)
 {
@@ -110,8 +110,12 @@ CRC32_checksum(krb5_context context,
 
     _krb5_crc_init_table ();
 
-    for (i = 0; i < niov; i++)
-	crc = _krb5_crc_update (iov[i].iov_base, iov[i].iov_len, crc);
+    for (i = 0; i < niov; i++) {
+	if (iov[i].flags == KRB5_CRYPTO_TYPE_DATA ||
+	    iov[i].flags == KRB5_CRYPTO_TYPE_SIGN_ONLY) {
+	    crc = _krb5_crc_update(iov[i].data.data, iov[i].data.length, crc);
+	}
+    }
 
     r[0] = crc & 0xff;
     r[1] = (crc >> 8)  & 0xff;
@@ -124,7 +128,7 @@ static krb5_error_code
 RSA_MD4_checksum(krb5_context context,
 		 struct _krb5_key_data *key,
 		 unsigned usage,
-		 const struct iovec *iov,
+		 const struct krb5_crypto_iov *iov,
 		 int niov,
 		 Checksum *C)
 {
@@ -137,7 +141,7 @@ static krb5_error_code
 RSA_MD4_DES_checksum(krb5_context context,
 		     struct _krb5_key_data *key,
 		     unsigned usage,
-		     const struct iovec *iov,
+		     const struct krb5_crypto_iov *iov,
 		     int niov,
 		     Checksum *cksum)
 {
@@ -159,7 +163,7 @@ static krb5_error_code
 RSA_MD5_DES_checksum(krb5_context context,
 		     struct _krb5_key_data *key,
 		     unsigned usage,
-		     const struct iovec *iov,
+		     const struct krb5_crypto_iov *iov,
 		     int niov,
 		     Checksum *C)
 {

@@ -59,7 +59,7 @@ krb5_error_code
 _krb5_HMAC_MD5_checksum(krb5_context context,
 			struct _krb5_key_data *key,
 			unsigned usage,
-			const struct iovec *iov,
+			const struct krb5_crypto_iov *iov,
 			int niov,
 			Checksum *result)
 {
@@ -94,8 +94,12 @@ _krb5_HMAC_MD5_checksum(krb5_context context,
     t[2] = (usage >> 16) & 0xFF;
     t[3] = (usage >> 24) & 0xFF;
     EVP_DigestUpdate(m, t, 4);
-    for (i = 0; i < niov; i++)
-	EVP_DigestUpdate(m, iov[i].iov_base, iov[i].iov_len);
+    for (i = 0; i < niov; i++) {
+	if (iov[i].flags == KRB5_CRYPTO_TYPE_DATA ||
+	    iov[i].flags == KRB5_CRYPTO_TYPE_SIGN_ONLY) {
+	    EVP_DigestUpdate(m, iov[i].data.data, iov[i].data.length);
+	}
+    }
     EVP_DigestFinal_ex (m, tmp, NULL);
     EVP_MD_CTX_destroy(m);
 
