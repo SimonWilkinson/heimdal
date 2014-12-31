@@ -102,8 +102,12 @@ _krb5_evp_digest_iov(krb5_crypto crypto,
 
     for (i = 0; i < niov; i++) {
 	if (iov[i].flags == KRB5_CRYPTO_TYPE_DATA
-	    || iov[i].flags == KRB5_CRYPTO_TYPE_SIGN_ONLY) {
-	    ret = EVP_DigestUpdate(ctx, iov[i].data.data, iov[i].data.length);
+	    || iov[i].flags == KRB5_CRYPTO_TYPE_SIGN_ONLY
+	    || iov[i].flags == KRB5_CRYPTO_TYPE_HEADER
+	    || iov[i].flags == KRB5_CRYPTO_TYPE_PADDING) {
+	    ret = EVP_DigestUpdate(ctx,
+				   iov[i].data.data,
+				   iov[i].data.length);
 	    if (ret != 1)
 		goto out;
 	}

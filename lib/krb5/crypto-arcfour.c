@@ -102,7 +102,9 @@ _krb5_HMAC_MD5_checksum(krb5_context context,
     EVP_DigestUpdate(m, t, 4);
     for (i = 0; i < niov; i++) {
 	if (iov[i].flags == KRB5_CRYPTO_TYPE_DATA ||
-	    iov[i].flags == KRB5_CRYPTO_TYPE_SIGN_ONLY) {
+	    iov[i].flags == KRB5_CRYPTO_TYPE_SIGN_ONLY ||
+	    iov[i].flags == KRB5_CRYPTO_TYPE_HEADER ||
+	    iov[i].flags == KRB5_CRYPTO_TYPE_PADDING) {
 	    EVP_DigestUpdate(m, iov[i].data.data, iov[i].data.length);
 	}
     }
