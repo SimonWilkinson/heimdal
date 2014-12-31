@@ -45,6 +45,7 @@ struct _krb5_key_usage;
 struct krb5_crypto_data {
     struct _krb5_encryption_type *et;
     struct _krb5_key_data key;
+    EVP_MD_CTX *mdctx;
     int num_key_usage;
     struct _krb5_key_usage *key_usage;
 };
@@ -89,11 +90,13 @@ struct _krb5_checksum_type {
     size_t checksumsize;
     unsigned flags;
     krb5_error_code (*checksum)(krb5_context context,
+				krb5_crypto crypto,
 				struct _krb5_key_data *key,
 				unsigned usage,
 				const struct krb5_crypto_iov *iov, int niov,
 				Checksum *csum);
     krb5_error_code (*verify)(krb5_context context,
+			      krb5_crypto crypto,
 			      struct _krb5_key_data *key,
 			      unsigned usage,
 			      const struct krb5_crypto_iov *iov, int niov,

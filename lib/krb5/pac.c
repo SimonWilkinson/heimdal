@@ -108,7 +108,7 @@ HMAC_MD5_any_checksum(krb5_context context,
     iov[0].data.length = len;
     iov[0].flags = KRB5_CRYPTO_TYPE_DATA;
 
-    ret = _krb5_HMAC_MD5_checksum(context, &local_key, usage, iov, 1, result);
+    ret = _krb5_HMAC_MD5_checksum(context, NULL, &local_key, usage, iov, 1, result);
     if (ret)
 	krb5_data_free(&result->checksum);
 
