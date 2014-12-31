@@ -1403,52 +1403,16 @@ krb5_encrypt_iov_ivec(krb5_context context,
     if (tiv == NULL || tiv->data.length != trailersz)
 	return KRB5_BAD_MSIZE;
 
-    /*
-     * XXX replace with EVP_Sign? at least make create_checksum an iov
-     * function.
-     * XXX CTS EVP is broken, can't handle multi buffers :(
-     */
-
-    len = block_sz;
-    for (i = 0; i < num_data; i++) {
-	if (data[i].flags != KRB5_CRYPTO_TYPE_SIGN_ONLY)
-	    continue;
-	len += data[i].data.length;
-    }
-
-    p = q = malloc(len);
-
-    memcpy(q, hiv->data.data, hiv->data.length);
-    q += hiv->data.length;
-    for (i = 0; i < num_data; i++) {
-	if (data[i].flags != KRB5_CRYPTO_TYPE_DATA &&
-	    data[i].flags != KRB5_CRYPTO_TYPE_SIGN_ONLY)
-	    continue;
-	memcpy(q, data[i].data.data, data[i].data.length);
-	q += data[i].data.length;
-    }
-    if (piv)
-	memset(q, 0, piv->data.length);
-
-    ret = create_checksum(context,
-			  et->keyed_checksum,
-			  crypto,
-			  INTEGRITY_USAGE(usage),
-			  p,
-			  len,
-			  &cksum);
-    free(p);
-    if(ret == 0 && cksum.checksum.length != trailersz) {
-	free_Checksum (&cksum);
-	krb5_clear_error_message (context);
-	ret = KRB5_CRYPTO_INTERNAL;
-    }
+    cksum.checksum = tiv->data;
+    ret = create_checksum_iov(context,
+			      et->keyed_checksum,
+			      crypto,
+			      INTEGRITY_USAGE(usage),
+			      data,
+			      num_data,
+			      &cksum);
     if(ret)
 	return ret;
-
-    /* save cksum at end */
-    memcpy(tiv->data.data, cksum.checksum.data, cksum.checksum.length);
-    free_Checksum (&cksum);
 
     /* XXX replace with EVP_Cipher */
     p = q = malloc(block_sz);
