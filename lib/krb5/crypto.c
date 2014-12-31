@@ -1393,7 +1393,7 @@ krb5_encrypt_iov_ivec(krb5_context context,
 	    return KRB5_BAD_MSIZE;
 	piv->data.length = pad_sz;
 	if (pad_sz)
-	    memset(piv->data.data, pad_sz, pad_sz);
+	    memset(piv->data.data, 0, pad_sz);
 	else
 	    piv = NULL;
     }
