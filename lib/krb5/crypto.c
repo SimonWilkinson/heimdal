@@ -263,33 +263,15 @@ _krb5_internal_hmac_iov(krb5_context context,
 			struct _krb5_key_data *keyblock,
 			Checksum *result)
 {
-    unsigned char *ipad, *opad;
+    unsigned char pad[64];
+    unsigned char cksum[20];
     unsigned char *key;
-    struct krb5_crypto_iov *working;
+    Checksum cksm;
+    struct krb5_crypto_iov working[64];
     size_t key_len;
     size_t i;
 
-    ipad = malloc(cm->blocksize);
-    if (ipad == NULL)
-	return ENOMEM;
-
-    opad = malloc(cm->blocksize + cm->checksumsize);
-    if (opad == NULL) {
-	free(ipad);
-	return ENOMEM;
-    }
-
-    working = calloc(niov + 1, sizeof(struct krb5_crypto_iov));
-    if (working == NULL) {
-	free(ipad);
-	free(opad);
-	return ENOMEM;
-    }
-
-    memset(ipad, 0x36, cm->blocksize);
-    memset(opad, 0x5c, cm->blocksize);
-
-    if(keyblock->key->keyvalue.length > cm->blocksize){
+    if(keyblock->key->keyvalue.length > cm->blocksize) {
 	working[0].data = keyblock->key->keyvalue;
 	working[0].flags = KRB5_CRYPTO_TYPE_DATA;
 	(*cm->checksum)(context,
@@ -307,32 +289,31 @@ _krb5_internal_hmac_iov(krb5_context context,
     }
 
     /* Set up 'ipad' */
-    fast_xor(ipad, key, key_len, 0x36363636);
-    memset(&ipad[key_len], 0x36, cm->blocksize - key_len);
+    fast_xor(pad, key, key_len, 0x36363636);
+    memset(&pad[key_len], 0x36, cm->blocksize - key_len);
 
-    working[0].data.data = ipad;
+    working[0].data.data = &pad;
     working[0].data.length = cm->blocksize;
     working[0].flags = KRB5_CRYPTO_TYPE_DATA;
     for (i = 0; i < niov; i++)
 	working[i + 1] = iov[i];
 
-    (*cm->checksum)(context, crypto, keyblock, usage, working, niov + 1, result);
-    memcpy(opad + cm->blocksize, result->checksum.data,
-	   result->checksum.length);
+    cksm.checksum.data = &cksum;
+    cksm.checksum.length = cm->checksumsize;
+    (*cm->checksum)(context, crypto, keyblock, usage, working, niov + 1, &cksm);
 
     /* Now set up 'opad' */
-    fast_xor(opad, key, key_len, 0x5c5c5c5c);
-    memset(&opad[key_len], 0x5c, cm->blocksize - key_len);
+    fast_xor(pad, key, key_len, 0x5c5c5c5c);
+    memset(&pad[key_len], 0x5c, cm->blocksize - key_len);
 
-    working[0].data.data = opad;
-    working[0].data.length = cm->blocksize + cm->checksumsize;
+    working[0].data.data = &pad;
+    working[0].data.length = cm->blocksize;
     working[0].flags = KRB5_CRYPTO_TYPE_DATA;
-    (*cm->checksum)(context, crypto, keyblock, usage, working, 1, result);
-    memset(ipad, 0, cm->blocksize);
-    free(ipad);
-    memset(opad, 0, cm->blocksize + cm->checksumsize);
-    free(opad);
-    free(working);
+    working[1].data = cksm.checksum;
+    working[1].flags = KRB5_CRYPTO_TYPE_DATA;
+    (*cm->checksum)(context, crypto, keyblock, usage, working, 2, result);
+
+    memset(pad, 0, cm->blocksize);
 
     return 0;
 }
