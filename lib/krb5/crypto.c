@@ -231,6 +231,27 @@ SHA1_checksum(krb5_context context,
     return 0;
 }
 
+static inline void
+fast_xor_byte(unsigned char *dest, unsigned char *src, size_t size,
+	      unsigned char constant)
+{
+    for (; size > 0; size--)
+	*dest++ = constant ^ *src++;
+}
+
+static inline void
+fast_xor(unsigned char *dest, unsigned char *src, size_t size,
+	 unsigned int constant)
+{
+    uint32_t *a = (uint32_t *)dest;
+    uint32_t *b = (uint32_t *)src;
+
+    for (; size >=4; size -= 4)
+	*a++ = constant ^ *b++;
+
+    fast_xor_byte((uint8_t *)a, (uint8_t *)b, size, constant & 0xff);
+}
+
 /* HMAC according to RFC2104 */
 KRB5_LIB_FUNCTION krb5_error_code KRB5_LIB_CALL
 _krb5_internal_hmac_iov(krb5_context context,
@@ -284,10 +305,10 @@ _krb5_internal_hmac_iov(krb5_context context,
 	key = keyblock->key->keyvalue.data;
 	key_len = keyblock->key->keyvalue.length;
     }
-    for(i = 0; i < key_len; i++){
-	ipad[i] ^= key[i];
-	opad[i] ^= key[i];
-    }
+
+    /* Set up 'ipad' */
+    fast_xor(ipad, key, key_len, 0x36363636);
+    memset(&ipad[key_len], 0x36, cm->blocksize - key_len);
 
     working[0].data.data = ipad;
     working[0].data.length = cm->blocksize;
@@ -298,6 +319,10 @@ _krb5_internal_hmac_iov(krb5_context context,
     (*cm->checksum)(context, crypto, keyblock, usage, working, niov + 1, result);
     memcpy(opad + cm->blocksize, result->checksum.data,
 	   result->checksum.length);
+
+    /* Now set up 'opad' */
+    fast_xor(opad, key, key_len, 0x5c5c5c5c);
+    memset(&opad[key_len], 0x5c, cm->blocksize - key_len);
 
     working[0].data.data = opad;
     working[0].data.length = cm->blocksize + cm->checksumsize;
