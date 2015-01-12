@@ -86,6 +86,7 @@ _krb5_evp_digest_iov(krb5_crypto crypto,
 {
     EVP_MD_CTX *ctx;
     int ret, i;
+    krb5_data current = {0,0};
 
     if (crypto != NULL) {
 	if (crypto->mdctx == NULL)
@@ -105,16 +106,24 @@ _krb5_evp_digest_iov(krb5_crypto crypto,
 	    || iov[i].flags == KRB5_CRYPTO_TYPE_SIGN_ONLY
 	    || iov[i].flags == KRB5_CRYPTO_TYPE_HEADER
 	    || iov[i].flags == KRB5_CRYPTO_TYPE_PADDING) {
-	    ret = EVP_DigestUpdate(ctx,
-				   iov[i].data.data,
-				   iov[i].data.length);
-	    if (ret != 1)
-		goto out;
+	    if ((char *)current.data + current.length == iov[i].data.data) {
+		current.length += iov[i].data.length;
+	    } else {
+		ret = EVP_DigestUpdate(ctx, current.data, current.length);
+		if (ret != 1)
+		    goto out;
+		current = iov[i].data;
+	    }
 	}
     }
 
-    ret = EVP_DigestFinal_ex(ctx, hash, hsize);
+    if (current.data) {
+	ret = EVP_DigestUpdate(ctx, current.data, current.length);
+	if (ret != 1)
+	    goto out;
+    }
 
+    ret = EVP_DigestFinal_ex(ctx, hash, hsize);
 out:
     if (crypto == NULL)
         EVP_MD_CTX_destroy(ctx);
