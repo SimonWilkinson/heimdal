@@ -1364,16 +1364,39 @@ krb5_encrypt_iov_ivec(krb5_context context,
     headersz = et->confoundersize;
     trailersz = CHECKSUMSIZE(et->keyed_checksum);
 
-    for (len = 0, i = 0; i < num_data; i++) {
-	if (data[i].flags != KRB5_CRYPTO_TYPE_DATA)
-	    continue;
-	len += data[i].data.length;
+    /* Need padding, or no iovec encryption mode, so have to know length */
+    if (et->padsize != 1 || et->encrypt_iov == NULL) {
+	for (len = 0, i = 0; i < num_data; i++) {
+	    if (data[i].flags != KRB5_CRYPTO_TYPE_DATA)
+		continue;
+	    len += data[i].data.length;
+	}
+
+	sz = headersz + len;
+	block_sz = (sz + et->padsize - 1) &~ (et->padsize - 1); /* pad */
+	pad_sz = block_sz - sz;
     }
 
-    sz = headersz + len;
-    block_sz = (sz + et->padsize - 1) &~ (et->padsize - 1); /* pad */
+    piv = find_iv(data, num_data, KRB5_CRYPTO_TYPE_PADDING);
 
-    pad_sz = block_sz - sz;
+    if (et->padsize == 1) {
+	/* No padding */
+	if (piv != NULL)
+	    piv->data.length = 0;
+    } else {
+        /* its ok to have no TYPE_PADDING if there is no padding */
+        if (piv == NULL && pad_sz != 0)
+	    return KRB5_BAD_MSIZE;
+	if (piv) {
+	    if (piv->data.length < pad_sz)
+		return KRB5_BAD_MSIZE;
+	    piv->data.length = pad_sz;
+	    if (pad_sz)
+		memset(piv->data.data, 0, pad_sz);
+	    else
+	        piv = NULL;
+	}
+    }
 
     /* header */
 
@@ -1382,21 +1405,6 @@ krb5_encrypt_iov_ivec(krb5_context context,
 	return KRB5_BAD_MSIZE;
 
     krb5_generate_random_block(hiv->data.data, hiv->data.length);
-
-    /* padding */
-    piv = find_iv(data, num_data, KRB5_CRYPTO_TYPE_PADDING);
-    /* its ok to have no TYPE_PADDING if there is no padding */
-    if (piv == NULL && pad_sz != 0)
-	return KRB5_BAD_MSIZE;
-    if (piv) {
-	if (piv->data.length < pad_sz)
-	    return KRB5_BAD_MSIZE;
-	piv->data.length = pad_sz;
-	if (pad_sz)
-	    memset(piv->data.data, 0, pad_sz);
-	else
-	    piv = NULL;
-    }
 
     /* trailer */
     tiv = find_iv(data, num_data, KRB5_CRYPTO_TYPE_TRAILER);
@@ -1414,7 +1422,17 @@ krb5_encrypt_iov_ivec(krb5_context context,
     if(ret)
 	return ret;
 
-    /* XXX replace with EVP_Cipher */
+    ret = _get_derived_key(context, crypto, ENCRYPTION_USAGE(usage), &dkey);
+    if(ret)
+	return ret;
+
+    ret = _key_schedule(context, dkey);
+    if(ret)
+	return ret;
+
+    if (et->encrypt_iov != NULL)
+	return (*et->encrypt_iov)(context, dkey, data, num_data, 1, usage, ivec);
+
     p = q = malloc(block_sz);
     if(p == NULL)
 	return ENOMEM;
@@ -1427,20 +1445,6 @@ krb5_encrypt_iov_ivec(krb5_context context,
 	    continue;
 	memcpy(q, data[i].data.data, data[i].data.length);
 	q += data[i].data.length;
-    }
-    if (piv)
-	memset(q, 0, piv->data.length);
-
-
-    ret = _get_derived_key(context, crypto, ENCRYPTION_USAGE(usage), &dkey);
-    if(ret) {
-	free(p);
-	return ret;
-    }
-    ret = _key_schedule(context, dkey);
-    if(ret) {
-	free(p);
-	return ret;
     }
 
     ret = (*et->encrypt)(context, dkey, p, block_sz, 1, usage, ivec);
